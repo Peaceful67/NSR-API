@@ -1,0 +1,49 @@
+ define("NSR_API_TOKEN_PATH", '/auth/realms/nsr/protocol/openid-connect/token');
+
+define("NSR_API_USERNAME", 'username');
+define("NSR_API_PASSWORD", 'password');
+
+
+define("NSR_API_RESPONSE_ACCESS_TOKEN", 'access_token');
+define("NSR_API_RESPONSE_TOKEN_EXPIRES_IN", 'expires_in');
+ 
+ private function obtainNewToken() {
+        global $now;
+        $url = NSR_API_HTTP_PROTOCOL . getOptionValue(OPTIONS_NAME_NSR_URL) . NSR_API_TOKEN_PATH;
+        $curl = curl_init();
+        $token = '';
+        $post_data = array_to_http_query([
+            NSR_API_USERNAME => getOptionValue(OPTIONS_NAME_NSR_USER),
+            NSR_API_PASSWORD => getOptionValue(OPTIONS_NAME_NSR_PASSWORD),
+            'grant_type' => 'password',
+            'client_id' => 'nsr-api',
+        ]);
+        $header_arr = [
+            'Content-Type: application/x-www-form-urlencoded ',
+            'Host: ' . getOptionValue(OPTIONS_NAME_NSR_URL),
+            'Connection: Keep-Alive',
+            'User-Agent: Apache-HttpClient/4.1.1 (java 1.5)',
+            'Cache-Control: no-cache, , no-store, must-revalidate',
+        ];
+        $curlopt_arr = [
+            CURLOPT_URL => $url,
+            CURLOPT_POST => true,
+            CURLOPT_HEADER => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => NSR_API_TIMEOUT,
+            CURLOPT_POSTFIELDS => $post_data,
+            CURLOPT_HTTPHEADER => $header_arr,
+        ];
+        curl_setopt_array($curl, $curlopt_arr);
+        $resp = curl_exec($curl);
+        curl_close($curl);
+        $ret_arr = json_decode(substr($resp, strpos($resp, '{')), true);
+        if (isset($ret_arr[NSR_API_RESPONSE_ACCESS_TOKEN]) and isset($ret_arr[NSR_API_RESPONSE_TOKEN_EXPIRES_IN])) {
+            updateOption(OPTIONS_NAME_NSR_TOKEN_EXPIRE, $now + $ret_arr[NSR_API_RESPONSE_TOKEN_EXPIRES_IN]);
+            $token = $ret_arr[NSR_API_RESPONSE_ACCESS_TOKEN];
+        }
+        return $token;
+    }
